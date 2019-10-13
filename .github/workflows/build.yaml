@@ -1,0 +1,388 @@
+name: build images
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+  push:
+
+jobs:
+  pre:
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.python.outputs.used }}
+      compile: ${{ steps.compile.outputs.used }}
+      distcc: ${{ steps.distcc.outputs.used }}
+      homebrew: ${{ steps.homebrew.outputs.used }}
+      llvm: ${{ steps.llvm.outputs.used }}
+      java: ${{ steps.java.outputs.used }}
+      vcpkg: ${{ steps.vcpkg.outputs.used }}
+      buildfarm: ${{ steps.buildfarm.outputs.used }}
+      box: ${{ steps.box.outputs.used }}
+      bazel: ${{ steps.bazel.outputs.used }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: record change file list
+        run: git diff-tree --no-commit-id --name-only -r HEAD | tee list.txt
+      - id: python
+        run: |
+          if grep -q "python" ./list.txt; then
+            echo "::set-output name=used::true"
+          fi
+
+      - id: compile
+        run: |
+          if grep -q "compile" ./list.txt; then
+            echo "::set-output name=used::true"
+          fi
+
+      - id: distcc
+        run: |
+          if grep -q "distcc" ./list.txt; then
+            echo "::set-output name=used::true"
+          fi
+
+      - id: homebrew
+        run: |
+          if grep -q "homebrew" ./list.txt; then
+            echo "::set-output name=used::true"
+          fi
+
+      - id: llvm
+        run: |
+          if grep -q "llvm" ./list.txt; then
+            echo "::set-output name=used::true"
+          fi
+
+      - id: java
+        run: |
+          if grep -q "java" ./list.txt; then
+            echo "::set-output name=used::true"
+          fi
+
+      - id: vcpkg
+        run: |
+          if grep -q "vcpkg" ./list.txt; then
+            echo "::set-output name=used::true"
+          fi
+
+      - id: buildfarm
+        run: |
+          if grep -q "buildfarm" ./list.txt; then
+            echo "::set-output name=used::true"
+          fi
+
+      - id: box
+        run: |
+          if grep -q "box" ./list.txt; then
+            echo "::set-output name=used::true"
+          fi
+
+      - id: bazel
+        run: |
+          if grep -q "bazel" ./list.txt; then
+            echo "::set-output name=used::true"
+          fi
+
+  python:
+    if: always() && ( github.event_name == 'schedule' || needs.pre.outputs.python)
+    needs: [pre,]
+    outputs:
+      emit: ${{ steps.emit.outputs.emit }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - 'debian:10'
+          - 'ubuntu:21.04'
+        version:
+          - '2.7.18'
+          - '3.6.12'
+          - '3.9.1'
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: docker/setup-buildx-action@v1
+      - uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and push
+        run: |
+          ./python/build.sh ${{ matrix.os }} ${{ matrix.version }} --push
+
+      - name: emit
+        id: emit
+        run: echo "::set-output name=emit::true"
+
+  compile:
+    if: always() && ( github.event_name == 'schedule' || needs.pre.outputs.compile||needs.java.outputs.emit||needs.llvm.outputs.emit||needs.homebrew.outputs.emit||needs.bazel.outputs.emit||needs.python.outputs.emit)
+    needs: [pre,java, llvm, homebrew, bazel, python]
+    outputs:
+      emit: ${{ steps.emit.outputs.emit }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - 'ubuntu:21.04'
+          - 'debian:10'
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: docker/setup-buildx-action@v1
+      - uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and push
+        run: |
+          ./compile/build.sh ${{ matrix.os }} --push
+
+      - name: emit
+        id: emit
+        run: echo "::set-output name=emit::true"
+
+  distcc:
+    if: always() && ( github.event_name == 'schedule' || needs.pre.outputs.distcc)
+    needs: [pre,]
+    outputs:
+      emit: ${{ steps.emit.outputs.emit }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - 'ubuntu:21.04'
+          - 'debian:10'
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: docker/setup-buildx-action@v1
+      - uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and push
+        run: |
+          ./distcc/build.sh ${{ matrix.os }} --push
+
+      - name: emit
+        id: emit
+        run: echo "::set-output name=emit::true"
+
+  homebrew:
+    if: always() && ( github.event_name == 'schedule' || needs.pre.outputs.homebrew)
+    needs: [pre,]
+    outputs:
+      emit: ${{ steps.emit.outputs.emit }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - 'ubuntu:21.04'
+          - 'debian:10'
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: docker/setup-buildx-action@v1
+      - uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and push
+        run: |
+          ./homebrew/build.sh ${{ matrix.os }} --push
+
+      - name: emit
+        id: emit
+        run: echo "::set-output name=emit::true"
+
+  llvm:
+    if: always() && ( github.event_name == 'schedule' || needs.pre.outputs.llvm)
+    needs: [pre,]
+    outputs:
+      emit: ${{ steps.emit.outputs.emit }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - 'ubuntu:21.04'
+          - 'debian:10'
+        version:
+          - '11.0.1'
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: docker/setup-buildx-action@v1
+      - uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and push
+        run: |
+          ./llvm/build.sh ${{ matrix.os }} ${{ matrix.version }} --push
+
+      - name: emit
+        id: emit
+        run: echo "::set-output name=emit::true"
+
+  java:
+    if: always() && ( github.event_name == 'schedule' || needs.pre.outputs.java)
+    needs: [pre,]
+    outputs:
+      emit: ${{ steps.emit.outputs.emit }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - 'ubuntu:21.04'
+          - 'debian:10'
+        version:
+          - '15.0.2'
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: docker/setup-buildx-action@v1
+      - uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and push
+        run: |
+          ./java/build.sh ${{ matrix.os }} ${{ matrix.version }} --push
+
+      - name: emit
+        id: emit
+        run: echo "::set-output name=emit::true"
+
+  vcpkg:
+    if: always() && ( github.event_name == 'schedule' || needs.pre.outputs.vcpkg)
+    needs: [pre,]
+    outputs:
+      emit: ${{ steps.emit.outputs.emit }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - 'debian:9'
+          - 'debian:10'
+          - 'ubuntu:18.04'
+          - 'ubuntu:20.04'
+          - 'ubuntu:21.04'
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: docker/setup-buildx-action@v1
+      - uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and push
+        run: |
+          ./vcpkg/build.sh ${{ matrix.os }} --push
+
+      - name: emit
+        id: emit
+        run: echo "::set-output name=emit::true"
+
+  buildfarm:
+    if: always() && ( github.event_name == 'schedule' || needs.pre.outputs.buildfarm||needs.compile.outputs.emit)
+    needs: [pre,compile]
+    outputs:
+      emit: ${{ steps.emit.outputs.emit }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - 'ubuntu:21.04'
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: docker/setup-buildx-action@v1
+      - uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and push
+        run: |
+          ./buildfarm/build.sh ${{ matrix.os }} --push
+
+      - name: emit
+        id: emit
+        run: echo "::set-output name=emit::true"
+
+  box:
+    if: always() && ( github.event_name == 'schedule' || needs.pre.outputs.box||needs.compile.outputs.emit||needs.python.outputs.emit)
+    needs: [pre,compile, python]
+    outputs:
+      emit: ${{ steps.emit.outputs.emit }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - 'debian:10'
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: docker/setup-buildx-action@v1
+      - uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and push
+        run: |
+          ./box/build.sh ${{ matrix.os }} --push
+
+      - name: emit
+        id: emit
+        run: echo "::set-output name=emit::true"
+
+  bazel:
+    if: always() && ( github.event_name == 'schedule' || needs.pre.outputs.bazel)
+    needs: [pre,]
+    outputs:
+      emit: ${{ steps.emit.outputs.emit }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - 'ubuntu:21.04'
+          - 'debian:10'
+        version:
+          - '3.6.0'
+          - '4.0.0'
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: docker/setup-buildx-action@v1
+      - uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and push
+        run: |
+          ./bazel/build.sh ${{ matrix.os }} ${{ matrix.version }} --push
+
+      - name: emit
+        id: emit
+        run: echo "::set-output name=emit::true"
